@@ -1,0 +1,8 @@
+yfinance
+pandas
+requests
+beautifulsoup4
+matplotlib
+mplfinance
+selenium
+pillow
