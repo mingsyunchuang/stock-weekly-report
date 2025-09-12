@@ -243,7 +243,7 @@ if __name__ == "__main__":
     plot_all_k_lines()
     fetch_all_dividend_eps()
     from_email = "mingsyunapp@gmail.com"
-    app_password = "kntgipstnclmcrrw"
+    app_password = os.environ.get("GMAIL_APP_PASSWORD")
     to_email = "mingsyun@hotmail.com"
     all_blocks = []
     all_imgs = []
