@@ -88,18 +88,24 @@ def plot_k_line_with_indicators(csv_path, stock_name):
         figratio=(16, 10), figscale=1.0,
         returnfig=True)
     try:
+        # 修改後的 KD 標記 (對應 panel 2)
         if set(['KD_K', 'KD_D']).issubset(df_recent.columns):
             kd_vals = df_recent['KD_K']
             cross_80 = (kd_vals.shift(1) < 80) & (kd_vals >= 80)
             cross_20 = (kd_vals.shift(1) > 20) & (kd_vals <= 20)
-            axes.scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
-            axes.scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
+#            axes.scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
+            axes[2].scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
+#            axes.scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
+            axes[2].scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
+        # 修改後的 RSI 標記 (對應 panel 3)
         if 'RSI' in df_recent.columns:
             rsi_vals = df_recent['RSI']
             cross_70 = (rsi_vals.shift(1) < 70) & (rsi_vals >= 70)
             cross_30 = (rsi_vals.shift(1) > 30) & (rsi_vals <= 30)
-            axes.scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
-            axes.scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
+#            axes.scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
+            axes[3].scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
+#            axes.scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
+            axes[3].scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
     except Exception as e:
         print(f'KD/RSI 標記層錯誤：{e}')
     fig.savefig(img_path)
