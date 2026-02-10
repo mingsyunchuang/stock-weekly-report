@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from config import stock_targets
 from Goodinfo import get_eps_last5_years, get_gp_detail_html
 
+# 設定字體以支援中文顯示
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'SimHei', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -26,89 +27,110 @@ def download_and_calc_indicators(ticker, name):
     if hist.empty:
         print(f"{ticker} 無法取得資料")
         return
+    
+    # 計算技術指標
     hist['MA20'] = hist['Close'].rolling(window=20).mean()
     bb = ta.volatility.BollingerBands(close=hist['Close'], window=20, window_dev=2)
     hist['BBL'] = bb.bollinger_lband()
     hist['BBM'] = bb.bollinger_mavg()
     hist['BBU'] = bb.bollinger_hband()
+    
     macd = ta.trend.MACD(close=hist['Close'])
     hist['MACD'] = macd.macd()
     hist['MACD_signal'] = macd.macd_signal()
     hist['MACD_diff'] = macd.macd_diff()
+    
     stoch = ta.momentum.StochasticOscillator(
         high=hist['High'], low=hist['Low'], close=hist['Close'], window=9, smooth_window=3)
     hist['KD_K'] = stoch.stoch()
     hist['KD_D'] = stoch.stoch_signal()
+    
     hist['RSI'] = ta.momentum.RSIIndicator(close=hist['Close'], window=14).rsi()
+    
     os.makedirs('output', exist_ok=True)
     hist.to_csv(f'output/{ticker.upper()}_indicators.csv')
 
 def plot_k_line_with_indicators(csv_path, stock_name):
     df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+    
+    # 【修正 1】解決 Mixed Timezones 錯誤並去除時區資訊以利繪圖
     if not isinstance(df.index, pd.DatetimeIndex):
-#20260210        df.index = pd.to_datetime(df.index, errors='coerce')
         df.index = pd.to_datetime(df.index, errors='coerce', utc=True).tz_localize(None)
+    else:
+        df.index = df.index.tz_localize(None)
+
     df = df[df.index.notnull()]
     num_days = 60
     df_recent = df.tail(num_days)
+    
     macd_diff = df_recent.get('MACD_diff', pd.Series(0, index=df_recent.index))
     macd_colors = np.where(macd_diff >= 0, 'red', 'green')
+    
     addplots = []
+    # Panel 0: 主圖區域
     if 'MA20' in df_recent.columns:
         addplots.append(mpf.make_addplot(df_recent['MA20'], color='blue', panel=0, width=1.0))
     if set(['BBL', 'BBM', 'BBU']).issubset(df_recent.columns):
         addplots.append(mpf.make_addplot(df_recent['BBL'], color='green', width=0.8))
         addplots.append(mpf.make_addplot(df_recent['BBM'], color='magenta', width=0.8))
         addplots.append(mpf.make_addplot(df_recent['BBU'], color='red', width=0.8))
+    
+    # Panel 1: MACD
     if set(['MACD', 'MACD_signal', 'MACD_diff']).issubset(df_recent.columns):
         addplots.append(mpf.make_addplot(df_recent['MACD'], color='purple', panel=1, width=1, ylabel='MACD'))
         addplots.append(mpf.make_addplot(df_recent['MACD_signal'], color='orange', panel=1, width=1))
-        addplots.append(
-            mpf.make_addplot(macd_diff, type='bar', color=macd_colors, panel=1, width=0.7, alpha=0.7))
+        addplots.append(mpf.make_addplot(macd_diff, type='bar', color=macd_colors, panel=1, width=0.7, alpha=0.7))
+    
+    # Panel 2: KD
     if set(['KD_K', 'KD_D']).issubset(df_recent.columns):
         addplots.append(mpf.make_addplot(df_recent['KD_K'], color='dodgerblue', panel=2, width=1, ylabel='KD'))
         addplots.append(mpf.make_addplot(df_recent['KD_D'], color='gold', panel=2, width=1))
         kd_x = df_recent.index
         addplots.append(mpf.make_addplot(np.full(len(kd_x), 80), color='red', panel=2, secondary_y=False, width=1))
         addplots.append(mpf.make_addplot(np.full(len(kd_x), 20), color='green', panel=2, secondary_y=False, width=1))
+    
+    # Panel 3: RSI
     if 'RSI' in df_recent.columns:
         addplots.append(mpf.make_addplot(df_recent['RSI'], color='firebrick', panel=3, width=1, ylabel='RSI'))
         rsi_x = df_recent.index
         addplots.append(mpf.make_addplot(np.full(len(rsi_x), 70), color='red', panel=3, secondary_y=False, width=1))
         addplots.append(mpf.make_addplot(np.full(len(rsi_x), 30), color='green', panel=3, secondary_y=False, width=1))
+
     os.makedirs('output/charts', exist_ok=True)
     img_path = os.path.join('output', 'charts', os.path.basename(csv_path).replace('_indicators.csv', '.png'))
+    
     mc = mpf.make_marketcolors(up='red', down='green', edge='inherit', wick='black')
     s = mpf.make_mpf_style(base_mpf_style='yahoo', marketcolors=mc)
+    
     fig, axes = mpf.plot(
         df_recent, type='candle', style=s, ylabel='價格',
         addplot=addplots,
-        title=f"{stock_name} 3-Month Candlestick Chart/Bollinger Bands/MACD/KD/RSI",
+        title=f"{stock_name} 3-Month Analysis",
         volume=False,
         panel_ratios=(3, 1, 1, 1),
         figratio=(16, 10), figscale=1.0,
         returnfig=True)
+
     try:
-        # 修改後的 KD 標記 (對應 panel 2)
+        # 【修正 2】使用指定的 axes 索引來繪製 scatter 標記
         if set(['KD_K', 'KD_D']).issubset(df_recent.columns):
             kd_vals = df_recent['KD_K']
             cross_80 = (kd_vals.shift(1) < 80) & (kd_vals >= 80)
             cross_20 = (kd_vals.shift(1) > 20) & (kd_vals <= 20)
-#20260210            axes.scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
+            # KD 在 Panel 2，所以使用 axes[2]
             axes[2].scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
-#20260210            axes.scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
             axes[2].scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
-        # 修改後的 RSI 標記 (對應 panel 3)
+
         if 'RSI' in df_recent.columns:
             rsi_vals = df_recent['RSI']
             cross_70 = (rsi_vals.shift(1) < 70) & (rsi_vals >= 70)
             cross_30 = (rsi_vals.shift(1) > 30) & (rsi_vals <= 30)
-#20260210            axes.scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
+            # RSI 在 Panel 3，所以使用 axes[3]
             axes[3].scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
-#20260210            axes.scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
             axes[3].scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
     except Exception as e:
         print(f'KD/RSI 標記層錯誤：{e}')
+
     fig.savefig(img_path)
     plt.close(fig)
     print(f"已產生：{img_path}")
@@ -116,81 +138,89 @@ def plot_k_line_with_indicators(csv_path, stock_name):
 def plot_all_k_lines():
     for t, name in stock_targets:
         code = t.upper()
-        plot_k_line_with_indicators(f'output/{code}_indicators.csv', name)
-
-def fetch_tw_dividend_eps(stock_id, name):
-    return get_eps_last5_years(stock_id, name)
+        csv_file = f'output/{code}_indicators.csv'
+        if os.path.exists(csv_file):
+            plot_k_line_with_indicators(csv_file, name)
 
 def fetch_all_dividend_eps():
     result = []
     for ticker, name in stock_targets:
+        # 僅針對台灣股市進行財報抓取
         if ticker.endswith('.TW') or ticker.endswith('.TWO') or ticker[:4].isdigit():
             code = ticker.upper().split('.')[0]
-            result.extend(fetch_tw_dividend_eps(code, name))
-        # 你可以根據需求改美股/港股的查法
-    if not result:
-        print('無法取得任何股票殖利率/EPS資料')
-        return
-    df = pd.DataFrame(result)
-    for col in ['ticker','name','year','dividend_yield','eps']:
-        if col not in df.columns:
-            df[col] = None
-    df = df[['ticker','name','year','dividend_yield','eps']]
-    df = df.sort_values(['ticker','year'], ascending=[True,False])
+            try:
+                data = get_eps_last5_years(code, name)
+                if data:
+                    result.extend(data)
+            except Exception as e:
+                print(f"[Goodinfo] {code} 抓取異常: {e}")
+    
     os.makedirs("output", exist_ok=True)
+    # 【修正 3】即使沒資料也產生 CSV，避免後續讀取報錯
+    if not result:
+        print('警告：無法取得任何股票殖利率/EPS資料')
+        df = pd.DataFrame(columns=['ticker','name','year','dividend_yield','eps'])
+    else:
+        df = pd.DataFrame(result)
+        for col in ['ticker','name','year','dividend_yield','eps']:
+            if col not in df.columns:
+                df[col] = None
+        df = df[['ticker','name','year','dividend_yield','eps']]
+        df = df.sort_values(['ticker','year'], ascending=[True,False])
+    
     df.to_csv('output/stock_earning_summary.csv', index=False)
-    print("已自動產生 5 年殖利率/EPS output/stock_earning_summary.csv")
+    print("已產生 5 年殖利率/EPS 報表")
 
 def extract_recent_signals(csv_path):
+    if not os.path.exists(csv_path): return []
     df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index, errors='coerce', utc=True).tz_localize(None)
+    else:
+        df.index = df.index.tz_localize(None)
+
     today = datetime.now().date()
     last_week = today - timedelta(days=7)
     res = []
+    
     if 'Close' not in df.columns: return res
+    
+    # KD 訊號
     if 'KD_K' in df.columns:
         kk = df['KD_K']
         cross_80 = (kk.shift(1)<80) & (kk>=80)
         cross_20 = (kk.shift(1)>20) & (kk<=20)
         for date in df.index[cross_80]:
-            d = date.date()
-            if last_week < d <= today:
-                res.append({'type':'KD_K 上穿80', 'date':str(d),
-                            'KD_K': round(kk.loc[date],2),
-                            'Close': round(df.loc[date,'Close'],2)})
+            if last_week < date.date() <= today:
+                res.append({'type':'KD_K 上穿80', 'date':str(date.date()), 'KD_K': round(kk.loc[date],2), 'Close': round(df.loc[date,'Close'],2)})
         for date in df.index[cross_20]:
-            d = date.date()
-            if last_week < d <= today:
-                res.append({'type':'KD_K 下穿20', 'date':str(d),
-                            'KD_K': round(kk.loc[date],2),
-                            'Close': round(df.loc[date,'Close'],2)})
+            if last_week < date.date() <= today:
+                res.append({'type':'KD_K 下穿20', 'date':str(date.date()), 'KD_K': round(kk.loc[date],2), 'Close': round(df.loc[date,'Close'],2)})
+    
+    # RSI 訊號
     if 'RSI' in df.columns:
         rsi = df['RSI']
         cross_70 = (rsi.shift(1)<70)&(rsi>=70)
         cross_30 = (rsi.shift(1)>30)&(rsi<=30)
         for date in df.index[cross_70]:
-            d = date.date()
-            if last_week < d <= today:
-                res.append({'type':'RSI 上穿70', 'date':str(d),
-                            'RSI': round(rsi.loc[date],2),
-                            'Close': round(df.loc[date,'Close'],2)})
+            if last_week < date.date() <= today:
+                res.append({'type':'RSI 上穿70', 'date':str(date.date()), 'RSI': round(rsi.loc[date],2), 'Close': round(df.loc[date,'Close'],2)})
         for date in df.index[cross_30]:
-            d = date.date()
-            if last_week < d <= today:
-                res.append({'type':'RSI 下穿30', 'date':str(d),
-                            'RSI': round(rsi.loc[date],2),
-                            'Close': round(df.loc[date,'Close'],2)})
+            if last_week < date.date() <= today:
+                res.append({'type':'RSI 下穿30', 'date':str(date.date()), 'RSI': round(rsi.loc[date],2), 'Close': round(df.loc[date,'Close'],2)})
     return res
 
 def make_financial_summary_table(ticker, summary_file='output/stock_earning_summary.csv'):
     if not os.path.isfile(summary_file):
-        return "_無法讀取殖利率/配息/EPS資料_<br>"
+        return "_無法讀取資料_<br>"
     df = pd.read_csv(summary_file)
-    tstr = ticker.upper()
-    df = df[df['ticker'].str.upper() == tstr]
+    tstr = ticker.upper().split('.')[0]
+    df = df[df['ticker'].astype(str).str.upper() == tstr]
     df = df.sort_values('year', ascending=False).head(5)
     if df.empty:
-        return "_無資料_<br>"
-    s = "<table border=1 cellpadding=4><tr><th>年度</th><th>殖利率(%)</th><th>配息</th><th>EPS</th></tr>"
+        return "_無資料 (ETF無財報)_<br>"
+    
+    s = "<table border=1 cellpadding=4 style='border-collapse: collapse;'><tr><th>年度</th><th>殖利率(%)</th><th>配息</th><th>EPS</th></tr>"
     for _, row in df.iterrows():
         y = int(row['year']) if pd.notnull(row['year']) else "-"
         dy = row['dividend_yield'] if pd.notnull(row['dividend_yield']) else "-"
@@ -200,80 +230,103 @@ def make_financial_summary_table(ticker, summary_file='output/stock_earning_summ
     return s
 
 def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, recent_signals, cid):
-    html = f"<h2>{ticker} {name}</h2>"
-    html += f"<img src='cid:{cid[1:-1]}' style='width:800px;'><br>"
-    html += f"<b>近5年殖利率/配息/EPS</b>{summary_table}"
-    html += "<b>近一週警示訊號</b><br><table border=1 cellpadding=3><tr><th>類型</th><th>日期</th><th>K/RSI值</th><th>收盤</th></tr>"
-    if recent_signals and isinstance(recent_signals, list) and (recent_signals[0].get('type') != '本週無KD/RSI警示'):
+    html = f"<div style='border-bottom: 2px solid #eee; padding-bottom: 20px;'>"
+    html += f"<h2>{ticker} {name}</h2>"
+    html += f"<img src='cid:{cid[1:-1]}' style='width:100%; max-width:800px;'><br>"
+    html += f"<b>📊 近5年殖利率/配息/EPS</b>{summary_table}"
+    html += "<b>⚠️ 近一週警示訊號</b><br><table border=1 cellpadding=3 style='border-collapse: collapse;'><tr><th>類型</th><th>日期</th><th>K/RSI值</th><th>收盤</th></tr>"
+    
+    if recent_signals and recent_signals[0].get('type') != '本週無KD/RSI警示':
         for sig in recent_signals:
-            value = sig.get('KD_K') if sig.get('KD_K') not in [None, '-', ''] else sig.get('RSI')
-            html += f"<tr><td>{sig['type']}</td><td>{sig['date']}</td><td>{value}</td><td>{sig['Close']}</td></tr>"
+            val = sig.get('KD_K') if sig.get('KD_K') is not None else sig.get('RSI')
+            html += f"<tr><td>{sig['type']}</td><td>{sig['date']}</td><td>{val}</td><td>{sig['Close']}</td></tr>"
     else:
-        html += "<tr><td colspan=4>本週無KD/RSI警示</td></tr>"
+        html += "<tr><td colspan=4>本週無特別訊號</td></tr>"
     html += "</table><br>"
-    # ======== Goodinfo 靜態快照 (僅 div 主區塊) ==========
+
     tw_code = ticker.split('.')[0]
-    tw_url = f"https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={tw_code}"
-    detail_html = get_gp_detail_html(tw_code)
-    html += f"<h3>Goodinfo個股市況總覽快照</h3>"
-    html += f"<a href='{tw_url}'>[👉 查看 Goodinfo 個股市況原網頁]</a><br>"
-    html += f"{detail_html}<hr>"
+    if tw_code.isdigit() and len(tw_code) >= 4:
+        tw_url = f"https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={tw_code}"
+        detail_html = get_gp_detail_html(tw_code)
+        html += f"<h3>Goodinfo個股市況總覽</h3>"
+        html += f"<a href='{tw_url}'>[👉 查看原網頁]</a><br>"
+        html += f"{detail_html}"
+    html += "</div>"
     return html
 
 def send_inline_multi_stock_email(subject, to_email, all_blocks, all_imgs, from_email, app_password):
+    if not app_password:
+        print("錯誤：未設定 GMAIL_APP_PASSWORD 環境變數")
+        return
+    
     msg = MIMEMultipart("related")
     msg['From'] = from_email
     msg['To'] = to_email
     msg['Subject'] = subject
-    html_body = "".join(all_blocks)
-    body = MIMEMultipart("alternative")
-    body.attach(MIMEText(html_body, "html","utf-8"))
-    msg.attach(body)
+    
+    html_body = f"<html><body>{''.join(all_blocks)}</body></html>"
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    
     for chart_img_path, cid in all_imgs:
-        with open(chart_img_path, "rb") as img:
-            mime = MIMEImage(img.read())
-            mime.add_header("Content-ID", f"<{cid[1:-1]}>")
-            mime.add_header("Content-Disposition", "inline", filename=os.path.basename(chart_img_path))
-            msg.attach(mime)
+        if os.path.exists(chart_img_path):
+            with open(chart_img_path, "rb") as img:
+                mime = MIMEImage(img.read())
+                mime.add_header("Content-ID", f"<{cid[1:-1]}>")
+                mime.add_header("Content-Disposition", "inline", filename=os.path.basename(chart_img_path))
+                msg.attach(mime)
+    
     try:
         smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         smtp.login(from_email, app_password)
         smtp.send_message(msg)
         smtp.quit()
-        print(f"已寄出週報到:{to_email}")
+        print(f"成功寄出報告至: {to_email}")
     except Exception as e:
-        print(f"郵件寄送錯誤: {e}")
+        print(f"郵件發送失敗: {e}")
 
 if __name__ == "__main__":
+    # 1. 抓取資料
     for ticker, name in stock_targets:
         download_and_calc_indicators(ticker.upper(), name)
+    
+    # 2. 繪製圖表
     plot_all_k_lines()
+    
+    # 3. 抓取基本面
     fetch_all_dividend_eps()
+    
+    # 4. 準備郵件內容
     from_email = "mingsyunapp@gmail.com"
     app_password = os.environ.get("GMAIL_APP_PASSWORD")
     to_email = "mingsyun@hotmail.com"
+    
     all_blocks = []
     all_imgs = []
+    
     for ticker, name in stock_targets:
         code = ticker.upper()
         chart_img = f"output/charts/{code}.png"
         csv = f"output/{code}_indicators.csv"
+        
         summary_table = make_financial_summary_table(code)
         recent_signals = extract_recent_signals(csv)
+        
         if not recent_signals:
             recent_signals = [{'type':'本週無KD/RSI警示', 'date':'-', 'KD_K':'-', 'RSI':'-', 'Close':'-'}]
+            
         cid = make_msgid(domain="stock-report")
         html = make_single_stock_emailblock(code, name, chart_img, summary_table, recent_signals, cid)
+        
         all_blocks.append(html)
         all_imgs.append((chart_img, cid))
+    
+    # 5. 發送郵件
     if all_blocks:
         send_inline_multi_stock_email(
-            subject="多股票一週技術/殖利率/警示報告",
+            subject=f"投資週報 - {datetime.now().strftime('%Y/%m/%d')}",
             to_email=to_email,
             all_blocks=all_blocks,
             all_imgs=all_imgs,
             from_email=from_email,
             app_password=app_password
         )
-    else:
-        print("本週所有股票皆無KD/RSI警示，不發信。")
