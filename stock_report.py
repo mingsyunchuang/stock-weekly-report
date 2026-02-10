@@ -118,16 +118,16 @@ def plot_k_line_with_indicators(csv_path, stock_name):
             cross_80 = (kd_vals.shift(1) < 80) & (kd_vals >= 80)
             cross_20 = (kd_vals.shift(1) > 20) & (kd_vals <= 20)
             # KD 在 Panel 2，所以使用 axes[2]
-            axes.scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)
-            axes.scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)
+            axes.scatter(df_recent.index[cross_80], kd_vals[cross_80], marker='^', color='red', s=85, zorder=10)  #這段不要改, 改了圖會跑掉
+            axes.scatter(df_recent.index[cross_20], kd_vals[cross_20], marker='v', color='green', s=85, zorder=10)  #這段不要改, 改了圖會跑掉
 
         if 'RSI' in df_recent.columns:
             rsi_vals = df_recent['RSI']
             cross_70 = (rsi_vals.shift(1) < 70) & (rsi_vals >= 70)
             cross_30 = (rsi_vals.shift(1) > 30) & (rsi_vals <= 30)
             # RSI 在 Panel 3，所以使用 axes[3]
-            axes.scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)
-            axes.scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)
+            axes.scatter(df_recent.index[cross_70], rsi_vals[cross_70], marker='^', color='red', s=85, zorder=10)  #這段不要改, 改了圖會跑掉
+            axes.scatter(df_recent.index[cross_30], rsi_vals[cross_30], marker='v', color='green', s=85, zorder=10)  #這段不要改, 改了圖會跑掉
     except Exception as e:
         print(f'KD/RSI 標記層錯誤：{e}')
 
