@@ -50,7 +50,9 @@ def download_and_calc_indicators(ticker, name):
     os.makedirs('output', exist_ok=True)
     hist.to_csv(f'output/{ticker.upper()}_indicators.csv')
 
-def plot_k_line_with_indicators(csv_path, stock_name):
+# def plot_k_line_with_indicators(csv_path, stock_name):
+# 修改點：增加接收 ticker 參數
+def plot_k_line_with_indicators(csv_path, ticker, stock_name):
     df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
     
     # 【修正 1】解決 Mixed Timezones 錯誤並去除時區資訊以利繪圖
@@ -101,11 +103,22 @@ def plot_k_line_with_indicators(csv_path, stock_name):
     
     mc = mpf.make_marketcolors(up='red', down='green', edge='inherit', wick='black')
     s = mpf.make_mpf_style(base_mpf_style='yahoo', marketcolors=mc)
-    
+   
+#    fig, axes = mpf.plot(
+#        df_recent, type='candle', style=s, ylabel='價格',
+#        addplot=addplots,
+#        title=f"{stock_name} 3-Month Analysis",
+#        volume=False,
+#        panel_ratios=(3, 1, 1, 1),
+#        figratio=(16, 10), figscale=1.0,
+#        returnfig=True)
+    # 修改點：組合你想要的標題格式
+    full_title = f"{ticker} {stock_name} (3-Month Analysis)"
+
     fig, axes = mpf.plot(
         df_recent, type='candle', style=s, ylabel='價格',
         addplot=addplots,
-        title=f"{stock_name} 3-Month Analysis",
+        title=full_title,  # 修改點：套用組合好的標題
         volume=False,
         panel_ratios=(3, 1, 1, 1),
         figratio=(16, 10), figscale=1.0,
@@ -140,7 +153,9 @@ def plot_all_k_lines():
         code = t.upper()
         csv_file = f'output/{code}_indicators.csv'
         if os.path.exists(csv_file):
-            plot_k_line_with_indicators(csv_file, name)
+            # plot_k_line_with_indicators(csv_file, name)
+            # 修改點：增加傳入 code (即 1326.TW)
+            plot_k_line_with_indicators(csv_file, code, name)
 
 def fetch_all_dividend_eps():
     result = []
