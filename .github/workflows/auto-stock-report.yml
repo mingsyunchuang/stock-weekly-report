@@ -5,6 +5,8 @@ on:
     # 台灣比 UTC +8，所以下方設固定為週五21:00 UTC = 週六 5:00 台灣
     - cron: '0 21 * * 5'
   workflow_dispatch:   # 允許手動觸發
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 提前採用 Node.js 24 以解決警告
 
 jobs:
   run-stock-report:
@@ -18,15 +20,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Google Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set Gmail password env (if needed)
-        env:
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        run: echo "GMAIL_APP_PASSWORD is set"
+#      - name: Set Gmail password env (if needed)
+#        env:
+#          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+#        run: echo "GMAIL_APP_PASSWORD is set"
 
       - name: Run Stock Weekly Report
         env:
