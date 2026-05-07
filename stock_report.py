@@ -13,6 +13,7 @@ from email.utils import make_msgid
 from datetime import datetime, timedelta
 from config import stock_targets
 from Goodinfo import get_eps_last5_years, get_gp_detail_html
+from winvest import capture_river_charts
 
 # 設定字體以支援中文顯示
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'SimHei', 'Arial Unicode MS']
