@@ -244,7 +244,8 @@ def make_financial_summary_table(ticker, summary_file='output/stock_earning_summ
     s += "</table><br>"
     return s
 
-def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, recent_signals, cid):
+#def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, recent_signals, cid):
+def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, recent_signals, cid, pe_cid=None, pb_cid=None):
     html = f"<div style='border-bottom: 2px solid #eee; padding-bottom: 20px;'>"
     html += f"<h2>{ticker} {name}</h2>"
     html += f"<img src='cid:{cid[1:-1]}' style='width:100%; max-width:800px;'><br>"
@@ -261,6 +262,16 @@ def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, re
 
     tw_code = ticker.split('.')[0]
     if tw_code.isdigit() and len(tw_code) >= 4:
+        # 插入 Winvest 河流圖
+        if pe_cid or pb_cid:
+            html += f"<h3>Winvest 價值河流圖</h3>"
+            if pe_cid:
+                html += f"<b>本益比河流圖:</b><br><img src='cid:{pe_cid[1:-1]}' style='width:100%; max-width:800px;'><br>"
+            if pb_cid:
+                html += f"<b>股價淨值比河流圖:</b><br><img src='cid:{pb_cid[1:-1]}' style='width:100%; max-width:800px;'><br>"
+            html += "<br>"
+        # 插入 Winvest 河流圖
+        
         tw_url = f"https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={tw_code}"
         detail_html = get_gp_detail_html(tw_code)
         html += f"<h3>Goodinfo個股市況總覽</h3>"
@@ -330,7 +341,22 @@ if __name__ == "__main__":
             recent_signals = [{'type':'本週無KD/RSI警示', 'date':'-', 'KD_K':'-', 'RSI':'-', 'Close':'-'}]
             
         cid = make_msgid(domain="stock-report")
-        html = make_single_stock_emailblock(code, name, chart_img, summary_table, recent_signals, cid)
+
+        # 抓取河流圖 (僅針對台灣股市)
+        pe_img, pb_img = None, None
+        pe_cid, pb_cid = None, None
+        if code.split('.')[0].isdigit():
+            pe_img, pb_img = capture_river_charts(code)
+            if pe_img and os.path.exists(pe_img):
+                pe_cid = make_msgid(domain="winvest-pe")
+                all_imgs.append((pe_img, pe_cid))
+            if pb_img and os.path.exists(pb_img):
+                pb_cid = make_msgid(domain="winvest-pb")
+                all_imgs.append((pb_img, pb_cid))
+        # 抓取河流圖 (僅針對台灣股市)
+
+        html = make_single_stock_emailblock(code, name, chart_img, summary_table, recent_signals, cid, pe_cid, pb_cid)
+        #html = make_single_stock_emailblock(code, name, chart_img, summary_table, recent_signals, cid)
         
         all_blocks.append(html)
         all_imgs.append((chart_img, cid))
