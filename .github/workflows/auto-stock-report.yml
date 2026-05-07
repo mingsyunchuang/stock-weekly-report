@@ -5,18 +5,18 @@ on:
     # 台灣比 UTC +8，所以下方設固定為週五21:00 UTC = 週六 5:00 台灣
     - cron: '0 21 * * 5'
   workflow_dispatch:   # 允許手動觸發
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 提前採用 Node.js 24 以解決警告
+#env:
+#  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 提前採用 Node.js 24 以解決警告
 
 jobs:
   run-stock-report:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
