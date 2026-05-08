@@ -265,7 +265,9 @@ def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, re
     if tw_code.isdigit() and len(tw_code) >= 4:
         # 插入 Winvest 河流圖
         if pe_cid or pb_cid:
-            html += f"<h3>Winvest 價值河流圖</h3>"
+            #html += f"<h3>Winvest 價值河流圖</h3>"
+            winvest_url = f"https://winvest.tw/Stock/Symbol/Comment/{tw_code}"
+            html += f"<h3><a href='{winvest_url}'>{ticker} {name} Winvest 價值河流圖</a></h3>"
             if pe_cid:
                 html += f"<b>本益比河流圖:</b><br><img src='cid:{pe_cid[1:-1]}' style='width:100%; max-width:800px;'><br>"
             if pb_cid:
