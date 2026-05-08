@@ -42,6 +42,10 @@ def capture_river_charts(ticker):
         wait = WebDriverWait(driver, 30)
         time.sleep(5) # 額外等待 Vue 渲染
         
+        # 滾動到底部以觸發懶加載 (河流圖可能在下方)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(3)
+
         # 截取全螢幕供偵錯
         debug_full_path = os.path.join(output_dir, f"{stock_id}_debug_full.png")
         driver.save_screenshot(debug_full_path)
@@ -51,6 +55,7 @@ def capture_river_charts(ticker):
         try:
             # 嘗試多種定位方式：ID 或包含標題文字的元素
             selectors = [
+                (By.ID, "peRatioChartDiv"),
                 (By.ID, "StockPERiverChart"),
                 (By.XPATH, "//div[contains(., '本益比河流圖') and contains(@class, 'chart')]"),
                 (By.XPATH, "//h2[contains(text(), '本益比河流圖')]/following-sibling::div")
@@ -77,6 +82,7 @@ def capture_river_charts(ticker):
         # 股價淨值比河流圖
         try:
             selectors = [
+                (By.ID, "pbRatioChartDiv"),
                 (By.ID, "StockPBRiverChart"),
                 (By.XPATH, "//div[contains(., '股價淨值比河流圖') and contains(@class, 'chart')]"),
                 (By.XPATH, "//h2[contains(text(), '股價淨值比河流圖')]/following-sibling::div")
