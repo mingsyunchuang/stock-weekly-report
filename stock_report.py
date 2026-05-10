@@ -17,11 +17,7 @@ from config import stock_targets
 from Goodinfo import get_eps_last5_years, get_gp_detail_html
 from winvest import capture_river_charts
 
-# 設定 yfinance Session 以避免 Rate Limit
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-})
+# 備註：yfinance 現在內部使用 curl_cffi 處理 session，不建議手動傳入 requests session
 
 # 設定字體以支援中文顯示
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'SimHei', 'Arial Unicode MS']
@@ -31,7 +27,7 @@ ticker_to_name = {t.upper(): name for t, name in stock_targets}
 
 def download_and_calc_indicators(ticker, name):
     print(f"正在抓取 {name}({ticker}) ...")
-    stock = yf.Ticker(ticker, session=session)
+    stock = yf.Ticker(ticker)
     hist = stock.history(period="1y") # 修改點：使用 1y 代替 max 以減少數據量與請求負擔
     if hist.empty:
         print(f"{ticker} 無法取得資料")
