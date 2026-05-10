@@ -6,6 +6,8 @@ import mplfinance as mpf
 import numpy as np
 import os
 import smtplib
+import requests
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -15,6 +17,12 @@ from config import stock_targets
 from Goodinfo import get_eps_last5_years, get_gp_detail_html
 from winvest import capture_river_charts
 
+# 設定 yfinance Session 以避免 Rate Limit
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+})
+
 # 設定字體以支援中文顯示
 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'SimHei', 'Arial Unicode MS']
 plt.rcParams['axes.unicode_minus'] = False
@@ -23,11 +31,12 @@ ticker_to_name = {t.upper(): name for t, name in stock_targets}
 
 def download_and_calc_indicators(ticker, name):
     print(f"正在抓取 {name}({ticker}) ...")
-    stock = yf.Ticker(ticker)
-    hist = stock.history(period="max")
+    stock = yf.Ticker(ticker, session=session)
+    hist = stock.history(period="1y") # 修改點：使用 1y 代替 max 以減少數據量與請求負擔
     if hist.empty:
         print(f"{ticker} 無法取得資料")
         return
+
     
     # 計算技術指標
     hist['MA20'] = hist['Close'].rolling(window=20).mean()
@@ -265,7 +274,6 @@ def make_single_stock_emailblock(ticker, name, chart_img_path, summary_table, re
     if tw_code.isdigit() and len(tw_code) >= 4:
         # 插入 Winvest 河流圖
         if pe_cid or pb_cid:
-            #html += f"<h3>Winvest 價值河流圖</h3>"
             winvest_url = f"https://winvest.tw/Stock/Symbol/Comment/{tw_code}"
             html += f"<h3><a href='{winvest_url}'>{ticker} {name} Winvest 價值河流圖</a></h3>"
             if pe_cid:
@@ -317,6 +325,7 @@ if __name__ == "__main__":
     # 1. 抓取資料
     for ticker, name in stock_targets:
         download_and_calc_indicators(ticker.upper(), name)
+        time.sleep(1) # 增加延遲避免被 Yahoo 偵測為大量請求
     
     # 2. 繪製圖表
     plot_all_k_lines()
